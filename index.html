@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<title>へびの一年</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+<style>
+  body {
+    margin: 0;
+    background: #0f0f0f;
+    color: #fff;
+    font-family: system-ui, sans-serif;
+    text-align: center;
+    touch-action: manipulation;
+  }
+  canvas {
+    background: #1a1a1a;
+    display: block;
+    margin: 10px auto;
+  }
+  #message {
+    position: fixed;
+    top: 20px;
+    width: 100%;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.5s;
+  }
+</style>
+</head>
+<body>
+
+<div id="message"></div>
+<canvas id="game" width="800" height="600"></canvas>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+const messageBox = document.getElementById("message");
+
+// =====================
+// プレイヤー
+// =====================
+const player = {
+  x: 60,
+  y: 520,
+  vx: 0.8,   // 自動前進
+  vy: 0,
+  w: 22,
+  h: 22,
+  onGround: false
+};
+
+// =====================
+// 地形
+// =====================
+function groundY(x) {
+  if (x < 250) return 520 - (x - 60) * 0.4;     // 山①
+  if (x < 380) return 450 + (x - 250) * 0.8;   // 谷①
+  if (x < 550) return 540;                     // 平坦
+  return 540 - (x - 550) * 0.5;                 // 山②
+}
+
+// =====================
+// チェックポイント
+// =====================
+const checkpoints = [
+  { x: 300, done: false, prompt: "今年、しんどかったこと" },
+  { x: 600, done: false, prompt: "今年、楽しかったこと" }
+];
+
+// =====================
+// メッセージ
+// =====================
+function showMessage(text, time = 2000) {
+  messageBox.textContent = text;
+  messageBox.style.opacity = 1;
+  setTimeout(() => messageBox.style.opacity = 0, time);
+}
+
+showMessage("画面をタップして、進んでみよう", 3000);
+
+// =====================
+// ジャンプ入力（タップ／クリック）
+// =====================
+function tryJump() {
+  if (player.onGround) {
+    player.vy = -8;
+    player.onGround = false;
+  }
+}
+
+window.addEventListener("mousedown", tryJump);
+window.addEventListener("touchstart", e => {
+  e.preventDefault();
+  tryJump();
+}, { passive: false });
+
+// =====================
+// メインループ
+// =====================
+function update() {
+  // 自動前進
+  player.vx = Math.min(player.vx + 0.001, 1.5);
+
+  // 摩擦（下りで少し速く感じる）
+  player.vx *= 0.995;
+
+  // 重力
+  player.vy += 0.4;
+
+  // 移動
+  player.x += player.vx;
+  player.y += player.vy;
+
+  // 地面判定
+  const gy = groundY(player.x);
+  if (player.y + player.h > gy) {
+    player.y = gy - player.h;
+    player.vy = 0;
+    player.onGround = true;
+  }
+
+  // チェックポイント
+  checkpoints.forEach(cp => {
+    if (!cp.done && player.x > cp.x) {
+      cp.done = true;
+      const input = prompt(cp.prompt);
+      console.log(cp.prompt, input);
+      showMessage("少し、体がなじんだ");
+    }
+  });
+
+  draw();
+  requestAnimationFrame(update);
+}
+
+// =====================
+// 描画
+// =====================
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // 地形
+  ctx.strokeStyle = "#666";
+  ctx.beginPath();
+  for (let x = 0; x < canvas.width; x += 5) {
+    ctx.lineTo(x, groundY(x));
+  }
+  ctx.stroke();
+
+  // プレイヤー
+  ctx.fillStyle = "#6fdc6f";
+  ctx.fillRect(player.x, player.y, player.w, player.h);
+
+  // UI
+  ctx.fillStyle = "#aaa";
+  ctx.font = "14px sans-serif";
+  ctx.fillText("タップでジャンプ", 20, 580);
+}
+
+update();
+</script>
+
+</body>
+</html>
+
