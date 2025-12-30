@@ -5,87 +5,106 @@
 <title>へびの一年</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
 <style>
-  body {
+  html, body {
     margin: 0;
+    padding: 0;
     background: #0f0f0f;
-    color: #fff;
-    font-family: system-ui, sans-serif;
-    text-align: center;
+    overflow: hidden;
     touch-action: manipulation;
-  }
-  canvas {
-    background: #1a1a1a;
-    display: block;
-    margin: 10px auto;
+    font-family: system-ui, sans-serif;
   }
   #message {
     position: fixed;
     top: 20px;
     width: 100%;
+    text-align: center;
+    color: #fff;
     pointer-events: none;
     opacity: 0;
     transition: opacity 0.5s;
+    z-index: 10;
+  }
+  canvas {
+    display: block;
   }
 </style>
 </head>
 <body>
 
 <div id="message"></div>
-<canvas id="game" width="800" height="600"></canvas>
+<canvas id="game"></canvas>
 
 <script>
+/* =====================
+   Canvasサイズ調整
+===================== */
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
+
+function resize() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+window.addEventListener("resize", resize);
+resize();
+
 const messageBox = document.getElementById("message");
 
-// =====================
-// プレイヤー
-// =====================
+/* =====================
+   プレイヤー（世界座標）
+===================== */
 const player = {
-  x: 60,
-  y: 520,
-  vx: 0.8,   // 自動前進
+  x: 0,
+  y: 0,
+  vx: 1,
   vy: 0,
-  w: 22,
-  h: 22,
+  w: 24,
+  h: 24,
   onGround: false
 };
 
-// =====================
-// 地形
-// =====================
-function groundY(x) {
-  if (x < 250) return 520 - (x - 60) * 0.4;     // 山①
-  if (x < 380) return 450 + (x - 250) * 0.8;   // 谷①
-  if (x < 550) return 540;                     // 平坦
-  return 540 - (x - 550) * 0.5;                 // 山②
+/* =====================
+   カメラ
+===================== */
+const camera = {
+  x: 0
+};
+
+/* =====================
+   地形（世界座標）
+===================== */
+function groundY(worldX) {
+  if (worldX < 300) return canvas.height * 0.75 - worldX * 0.2;        // 山①
+  if (worldX < 500) return canvas.height * 0.55 + (worldX - 300) * 0.5; // 谷①
+  if (worldX < 800) return canvas.height * 0.8;                         // 平坦
+  return canvas.height * 0.8 - (worldX - 800) * 0.25;                   // 山②
 }
 
-// =====================
-// チェックポイント
-// =====================
+/* =====================
+   チェックポイント
+===================== */
 const checkpoints = [
-  { x: 300, done: false, prompt: "今年、しんどかったこと" },
-  { x: 600, done: false, prompt: "今年、楽しかったこと" }
+  { x: 350, done: false, prompt: "今年、しんどかったこと" },
+  { x: 900, done: false, prompt: "今年、楽しかったこと" }
 ];
 
-// =====================
-// メッセージ
-// =====================
+/* =====================
+   メッセージ
+===================== */
 function showMessage(text, time = 2000) {
   messageBox.textContent = text;
   messageBox.style.opacity = 1;
   setTimeout(() => messageBox.style.opacity = 0, time);
 }
 
-showMessage("画面をタップして、進んでみよう", 3000);
+showMessage("画面をタップして進んでみよう", 3000);
 
-// =====================
-// ジャンプ入力（タップ／クリック）
-// =====================
+/* =====================
+   入力（タップのみ）
+===================== */
 function tryJump() {
   if (player.onGround) {
-    player.vy = -8;
+    player.vy = -10;
     player.onGround = false;
   }
 }
@@ -96,18 +115,15 @@ window.addEventListener("touchstart", e => {
   tryJump();
 }, { passive: false });
 
-// =====================
-// メインループ
-// =====================
+/* =====================
+   メインループ
+===================== */
 function update() {
   // 自動前進
-  player.vx = Math.min(player.vx + 0.001, 1.5);
-
-  // 摩擦（下りで少し速く感じる）
-  player.vx *= 0.995;
+  player.vx = Math.min(player.vx + 0.002, 2);
 
   // 重力
-  player.vy += 0.4;
+  player.vy += 0.5;
 
   // 移動
   player.x += player.vx;
@@ -121,13 +137,16 @@ function update() {
     player.onGround = true;
   }
 
+  // カメラ追従（プレイヤーを中央寄せ）
+  camera.x = player.x - canvas.width * 0.35;
+
   // チェックポイント
   checkpoints.forEach(cp => {
     if (!cp.done && player.x > cp.x) {
       cp.done = true;
       const input = prompt(cp.prompt);
       console.log(cp.prompt, input);
-      showMessage("少し、体がなじんだ");
+      showMessage("少し、進めるようになった");
     }
   });
 
@@ -135,28 +154,25 @@ function update() {
   requestAnimationFrame(update);
 }
 
-// =====================
-// 描画
-// =====================
+/* =====================
+   描画
+===================== */
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // 地形
+  // 地形描画
   ctx.strokeStyle = "#666";
   ctx.beginPath();
-  for (let x = 0; x < canvas.width; x += 5) {
-    ctx.lineTo(x, groundY(x));
+  for (let sx = 0; sx < canvas.width; sx += 5) {
+    const wx = sx + camera.x;
+    ctx.lineTo(sx, groundY(wx));
   }
   ctx.stroke();
 
-  // プレイヤー
+  // プレイヤー描画（画面座標）
+  const screenX = player.x - camera.x;
   ctx.fillStyle = "#6fdc6f";
-  ctx.fillRect(player.x, player.y, player.w, player.h);
-
-  // UI
-  ctx.fillStyle = "#aaa";
-  ctx.font = "14px sans-serif";
-  ctx.fillText("タップでジャンプ", 20, 580);
+  ctx.fillRect(screenX, player.y, player.w, player.h);
 }
 
 update();
@@ -164,4 +180,3 @@ update();
 
 </body>
 </html>
-
