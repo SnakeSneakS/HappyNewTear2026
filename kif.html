@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <title>蛇 vs 馬 TD 再生</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <style>
+        body {
+            margin: 0;
+            background: #111;
+            color: #fff;
+            font-family: sans-serif;
+            text-align: center;
+        }
+
+        canvas {
+            display: block;
+            margin: auto;
+            background: #222;
+            touch-action: none;
+        }
+
+        #ui {
+            padding: 6px;
+        }
+
+        button {
+            margin: 4px;
+            padding: 6px;
+        }
+
+        textarea {
+            width: 90%;
+            height: 120px;
+            background: #222;
+            color: #0f0;
+            font-family: monospace;
+            margin: 8px 0;
+            border: 1px solid #555;
+            padding: 6px;
+        }
+    </style>
+
+</head>
+
+<body>
+    <div style="display: none">
+        <button id="submit-score-btn">ランキング送信</button>
+    </div>
+
+    <h2>棋譜再生エミュレーター</h2>
+
+    <div id="ui">
+        <textarea id="kif-input" placeholder="ここに棋譜(JSON)を貼り付けてください"></textarea>
+        <br>
+        <button id="load-kif-btn">読み込み＆再生</button>
+    </div>
+
+    <div id="ui">
+        再生速度: <span id="speed">x1</span>
+        <button onclick="setSpeed(1)">x1</button>
+        <button onclick="setSpeed(2)">x2</button>
+        <button onclick="setSpeed(3)">x3</button>
+        <button onclick="setSpeed(5)">x5</button>
+        <button onclick="setSpeed(10)">x10</button>
+    </div>
+
+    <canvas id="game" width="360" height="560"></canvas>
+
+
+    <script src="setting.js"></script>
+    <script src="index.js"></script>
+    <script defer>
+
+        //const canvas = document.getElementById("game");
+        //const ctx = canvas.getContext("2d");
+
+        function setSpeed(v) {
+            speedMultiplier = v;
+            document.getElementById("speed").textContent = "x" + v;
+        }
+
+        // -------------------------
+        // 読み込み＆再生
+        // -------------------------
+        let gameStarted = false;
+        document.getElementById("load-kif-btn").onclick = () => {
+            const input = document.getElementById("kif-input").value;
+            try {
+                const data = JSON.parse(input);
+                if (!Array.isArray(data)) throw "配列ではありません";
+                kifData = data;
+
+                // ゲーム初期化
+                frame = 0;
+                snakes.length = 0;
+                enemies.length = 0;
+                effects.length = 0;
+                cost = 10;
+                second = 0;
+                gameOver = false;
+                recordIndex = 0;
+                gameStarted = true;
+
+                requestAnimationFrame(gameLoop);
+            } catch (e) {
+                alert("棋譜の読み込みに失敗しました: " + e);
+            }
+        };
+
+        // -------------------------
+        // ロジック更新
+        // -------------------------
+        function updateLogic() {
+            if (gameOver || !gameStarted) return;
+
+            frame++;
+
+            // 棋譜操作を再生
+            while (recordIndex < kifData.length && kifData[recordIndex].frame <= frame) {
+                const act = kifData[recordIndex];
+                if (act.action === "placeSnake") {
+                    snakes.push({ ...act, timer: 0 });
+                }
+                if (act.action === "upgradeSnake") {
+                    const s = snakes.find(s => s.id === act.id);
+                    if (s) s.level = act.level;
+                }
+                recordIndex++;
+            }
+
+            if (frame % 60 === 0) second++;
+
+            // 敵生成
+            const spawnInterval = Math.max(120 - frame / 30, 50);
+            if (frame % spawnInterval === 0) spawnEnemy();
+
+            // 蛇攻撃・生産・減速
+            snakes.forEach(s => {
+                s.timer++;
+                const t = getSnakeStats(s);
+                if (t.produceSec && s.timer % (t.produceSec * FPS) === 0) {
+                    cost++;
+                    costEffects.push({ x: s.x, y: s.y - 20, text: `+${t.produceAmmount}`, life: 30 });
+                }
+
+                enemies.forEach(e => {
+                    const d = Math.hypot(e.x - s.x, e.y - s.y);
+                    if (d < t.range && t.rate && s.timer % t.rate === 0) {
+                        e.hp -= t.dmg || 0;
+                        if (t.slow) {
+                            e.slow = t.slow;
+                            e.slowTimer = t.slowTime;
+                        }
+                        if (t.dmg && t.dmg > 0) effects.push({ x: e.x, y: e.y, text: `-${t.dmg}`, life: 30 });
+                    }
+                });
+            });
+
+            // 敵移動
+            enemies.forEach(e => {
+                if (e.slowTimer > 0) e.slowTimer--; else e.slow = 1;
+                e.y += e.speed * e.slow;
+                e.hp -= e.poison;
+                if (e.y > defenseLine) gameOver = true;
+            });
+
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                if (enemies[i].hp <= 0) enemies.splice(i, 1);
+            }
+
+            // エフェクト
+            for (let i = effects.length - 1; i >= 0; i--) {
+                effects[i].y -= 0.5;
+                effects[i].life--;
+                if (effects[i].life <= 0) effects.splice(i, 1);
+            }
+        }
+
+        // -------------------------
+        // 描画
+        // -------------------------
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // レーン
+            ctx.strokeStyle = "#333";
+            lanes.forEach(x => {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            });
+
+            // 防衛ライン
+            ctx.strokeStyle = "red";
+            ctx.beginPath();
+            ctx.moveTo(0, defenseLine);
+            ctx.lineTo(canvas.width, defenseLine);
+            ctx.stroke();
+
+            // 蛇
+            snakes.forEach(s => {
+                const t = getSnakeStats(s);
+
+                // 攻撃範囲
+                ctx.fillStyle = "rgba(0,255,0,0.08)";
+                ctx.beginPath();
+                ctx.arc(s.x, s.y, t.range, 0, Math.PI * 2);
+                ctx.fill();
+                //接触範囲
+                ctx.lineWidth = SNAKE_DISTANCE_LINE_WIDTH;
+                ctx.strokeStyle = "rgba(255,0,0,0.15)";
+                ctx.beginPath();
+                ctx.arc(s.x, s.y, SNAKE_MIN_DISTANCE, 0, Math.PI * 2);
+                //ctx.lineWidth = 1.0;
+                ctx.stroke();
+                ctx.lineWidth = SNAKE_LINE_WIDTH;
+                //体
+                //ctx.fillStyle = "green";
+                //ctx.fillRect(s.x - 8, s.y - 8, 16, 16);
+                const img = ImageManager.get(t.imgKey);
+                const size = getEntitySize(IMG_BASE_SIZE, t.level);
+                ctx.drawImage(
+                    img,
+                    s.x - size / 2,
+                    s.y - size / 2,
+                    size,
+                    size
+                );
+
+                if (img.complete) {
+                    ctx.drawImage(
+                        img,
+                        s.x - size / 2,
+                        s.y - size / 2,
+                        size,
+                        size
+                    );
+                }
+            });
+
+
+            // 敵
+            enemies.forEach(e => {
+                const img = ImageManager.get(enemyTypes.normal.imgKey);
+                const size = IMG_BASE_SIZE;
+                ctx.drawImage(img, e.x - size / 2, e.y - size / 2, size, size);
+            });
+
+            // エフェクト
+            effects.forEach(f => {
+                ctx.fillStyle = `rgba(255,255,255,${f.life / 30})`;
+                ctx.fillText(f.text, f.x, f.y);
+            });
+        }
+
+        // -------------------------
+        // ゲームループ
+        // -------------------------
+
+        function gameLoop(now) {
+            const delta = now - lastTime;
+            lastTime = now;
+            accumulator += delta;
+
+            while (accumulator >= FRAME_TIME) {
+                for (let i = 0; i < speedMultiplier; i++) updateLogic();
+                accumulator -= FRAME_TIME;
+            }
+
+            draw();
+            if (!gameOver && gameStarted) requestAnimationFrame(gameLoop);
+        }
+    </script>
+
+</body>
+
+</html>

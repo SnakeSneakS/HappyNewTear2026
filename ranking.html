@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8">
+  <title>ランキング</title>
+  <style>
+    body {
+      background: #222;
+      color: #fff;
+      font-family: sans-serif;
+      text-align: center;
+      padding: 50px;
+    }
+
+    h1 {
+      margin-bottom: 20px;
+    }
+
+    #ranking-list {
+      max-width: 600px;
+      margin: 0 auto;
+      text-align: left;
+      background: rgba(255, 255, 255, 0.05);
+      padding: 16px;
+      border-radius: 8px;
+    }
+
+    #ranking-list .header,
+    #ranking-list div {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      word-break: break-word;
+    }
+
+    #ranking-list .header {
+      font-weight: bold;
+      border-bottom: 2px solid #fff;
+      padding-bottom: 8px;
+      margin-bottom: 4px;
+    }
+
+    #ranking-list div {
+      padding: 6px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+      color: #fff;
+      /* 名前・スコア・コメントを統一 */
+      font-weight: normal;
+    }
+
+    #ranking-list div:last-child {
+      border-bottom: none;
+    }
+
+    .rank {
+      width: 40px;
+      text-align: right;
+    }
+
+    .score {
+      width: 80px;
+      font-weight: bold;
+      text-align: right;
+    }
+
+    .name {
+      flex: 1;
+    }
+
+    .comment {
+      flex: 2;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>ランキング</h1>
+  <div id="ranking-list">読み込み中...</div>
+
+  <script src="setting.js"></script>
+  <script>
+    async function fetchRanking() {
+      const container = document.getElementById("ranking-list");
+      container.textContent = "読み込み中...";
+      try {
+        const res = await fetch(RANKING_API_URL);
+        const data = await res.json();
+
+        container.innerHTML = "";
+
+        // ラベル行
+        const header = document.createElement("div");
+        header.className = "header";
+
+        const rankLabel = document.createElement("span");
+        rankLabel.className = "rank";
+        rankLabel.textContent = "順位";
+
+        const nameLabel = document.createElement("span");
+        nameLabel.className = "name";
+        nameLabel.textContent = "名前";
+
+        const scoreLabel = document.createElement("span");
+        scoreLabel.className = "score";
+        scoreLabel.textContent = "スコア";
+
+        const commentLabel = document.createElement("span");
+        commentLabel.className = "comment";
+        commentLabel.textContent = "コメント";
+
+        header.appendChild(rankLabel);
+        header.appendChild(nameLabel);
+        header.appendChild(scoreLabel);
+        header.appendChild(commentLabel);
+        container.appendChild(header);
+
+        if (!Array.isArray(data) || data.length === 0) {
+          const emptyRow = document.createElement("div");
+          emptyRow.textContent = "ランキングはまだありません";
+          container.appendChild(emptyRow);
+          return;
+        }
+
+        // データ行
+        data.slice(0, 20).forEach((entry, i) => {
+          const div = document.createElement("div");
+
+          const rankSpan = document.createElement("span");
+          rankSpan.className = "rank";
+          rankSpan.textContent = `${i + 1}.`;
+
+          const nameSpan = document.createElement("span");
+          nameSpan.className = "name";
+          nameSpan.textContent = entry.name;
+
+          const scoreSpan = document.createElement("span");
+          scoreSpan.className = "score";
+          scoreSpan.textContent = entry.score;
+
+          const commentSpan = document.createElement("span");
+          commentSpan.className = "comment";
+          commentSpan.textContent = entry.comment || "";
+
+          div.appendChild(rankSpan);
+          div.appendChild(nameSpan);
+          div.appendChild(scoreSpan);
+          div.appendChild(commentSpan);
+
+          container.appendChild(div);
+        });
+      } catch (err) {
+        console.error(err);
+        container.textContent = "ランキングの取得に失敗しました";
+      }
+    }
+
+    fetchRanking();
+  </script>
+</body>
+
+</html>
