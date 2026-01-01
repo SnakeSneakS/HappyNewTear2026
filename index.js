@@ -700,12 +700,23 @@ function calculateScore() {
 
 function updateScoreUI() {
     const score = calculateScore();
-    document.getElementById("score-total").textContent = `合計スコア: ${score.total}`;
-    document.getElementById("score-snakes").textContent = `蛇スコア: ${score.snakeScore}`;
-    document.getElementById("score-enemies").textContent = `敵撃破: ${score.enemyScore}`;
-    document.getElementById("score-cost").textContent = `コスト: ${score.costScore}`;
-    document.getElementById("score-time").textContent = `生存時間: ${score.timeScore}`;
+
+    const elTotal = document.getElementById("score-total");
+    if (elTotal) elTotal.textContent = `合計スコア: ${score.total}`;
+
+    const elSnakes = document.getElementById("score-snakes");
+    if (elSnakes) elSnakes.textContent = `蛇設置スコア: ${score.snakeScore}`;
+
+    const elEnemies = document.getElementById("score-enemies");
+    if (elEnemies) elEnemies.textContent = `敵撃破スコア: ${score.enemyScore}`;
+
+    const elCost = document.getElementById("score-cost");
+    if (elCost) elCost.textContent = `所持金スコア: ${score.costScore}`;
+
+    const elTime = document.getElementById("score-time");
+    if (elTime) elTime.textContent = `生存時間スコア: ${score.timeScore}`;
 }
+
 
 function showRankingUI() {
     updateScoreUI();
@@ -714,7 +725,7 @@ function showRankingUI() {
     fetchRanking();
 }
 
-submitBtn.onclick = () => {
+if (submitBtn) submitBtn.onclick = () => {
     const name = nameInput.value.trim();
     const comment = document.getElementById("player-comment-input").value.trim(); // コメント取得
 

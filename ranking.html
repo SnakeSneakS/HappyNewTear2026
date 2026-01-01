@@ -76,7 +76,9 @@
 
 <body>
   <h1>ランキング</h1>
+  <p id="hint" style="color: #aaa; font-size: 0.9em; margin-top: -10px;">※行をクリックすると再生できます</p>
   <div id="ranking-list">読み込み中...</div>
+
 
   <script src="setting.js"></script>
   <script>
@@ -92,27 +94,14 @@
         // ラベル行
         const header = document.createElement("div");
         header.className = "header";
-
-        const rankLabel = document.createElement("span");
-        rankLabel.className = "rank";
-        rankLabel.textContent = "順位";
-
-        const nameLabel = document.createElement("span");
-        nameLabel.className = "name";
-        nameLabel.textContent = "名前";
-
-        const scoreLabel = document.createElement("span");
-        scoreLabel.className = "score";
-        scoreLabel.textContent = "スコア";
-
-        const commentLabel = document.createElement("span");
-        commentLabel.className = "comment";
-        commentLabel.textContent = "コメント";
-
-        header.appendChild(rankLabel);
-        header.appendChild(nameLabel);
-        header.appendChild(scoreLabel);
-        header.appendChild(commentLabel);
+        ["順位", "名前", "スコア", "コメント"].forEach(label => {
+          const span = document.createElement("span");
+          span.textContent = label;
+          span.className = label === "順位" ? "rank" :
+            label === "名前" ? "name" :
+              label === "スコア" ? "score" : "comment";
+          header.appendChild(span);
+        });
         container.appendChild(header);
 
         if (!Array.isArray(data) || data.length === 0) {
@@ -125,6 +114,8 @@
         // データ行
         data.slice(0, 20).forEach((entry, i) => {
           const div = document.createElement("div");
+          div.className = "data-row";
+          div.style.cursor = "pointer";
 
           const rankSpan = document.createElement("span");
           rankSpan.className = "rank";
@@ -142,10 +133,21 @@
           commentSpan.className = "comment";
           commentSpan.textContent = entry.comment || "";
 
+
+
           div.appendChild(rankSpan);
           div.appendChild(nameSpan);
           div.appendChild(scoreSpan);
           div.appendChild(commentSpan);
+
+          // chess record を data 属性に保存
+          div.dataset.kif = entry.kif || "";
+
+          // クリックで棋譜再生
+          div.onclick = () => {
+            const kifJson = encodeURIComponent(div.dataset.kif);
+            window.open(`kif.html?kif=${kifJson}`, "_blank");
+          };
 
           container.appendChild(div);
         });
@@ -154,9 +156,9 @@
         container.textContent = "ランキングの取得に失敗しました";
       }
     }
-
     fetchRanking();
   </script>
+
 </body>
 
 </html>

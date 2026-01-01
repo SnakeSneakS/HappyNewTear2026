@@ -22,6 +22,7 @@
         }
 
         #ui {
+            text-align: center;
             padding: 6px;
         }
 
@@ -40,16 +41,16 @@
             border: 1px solid #555;
             padding: 6px;
         }
-    </style>
 
+        textarea:disabled {
+            background: #333;
+            color: #888;
+        }
+    </style>
 </head>
 
 <body>
-    <div style="display: none">
-        <button id="submit-score-btn">ランキング送信</button>
-    </div>
-
-    <h2>棋譜再生エミュレーター</h2>
+    <h2>再生</h2>
 
     <div id="ui">
         <textarea id="kif-input" placeholder="ここに棋譜(JSON)を貼り付けてください"></textarea>
@@ -66,39 +67,46 @@
         <button onclick="setSpeed(10)">x10</button>
     </div>
 
-    <canvas id="game" width="360" height="560"></canvas>
+    <div id="ui">
+        お金: <span id="cost">10</span> |
+        生存: <span id="time">0</span>s
+    </div>
 
+    <canvas id="game" width="360" height="560"></canvas>
 
     <script src="setting.js"></script>
     <script src="index.js"></script>
     <script defer>
+        let kifData = [];
+        let recordIndex = 0;
+        let gameStarted = false;
 
-        //const canvas = document.getElementById("game");
-        //const ctx = canvas.getContext("2d");
+        const loadBtn = document.getElementById("load-kif-btn");
+        const kifInput = document.getElementById("kif-input");
 
+        // 再生速度制御
         function setSpeed(v) {
             speedMultiplier = v;
-            document.getElementById("speed").textContent = "x" + v;
+            const el = document.getElementById("speed");
+            if (el) el.textContent = "x" + v;
         }
 
-        // -------------------------
-        // 読み込み＆再生
-        // -------------------------
-        let gameStarted = false;
-        document.getElementById("load-kif-btn").onclick = () => {
-            const input = document.getElementById("kif-input").value;
+        // loadボタンで棋譜読み込み
+        loadBtn.onclick = () => {
             try {
-                const data = JSON.parse(input);
-                if (!Array.isArray(data)) throw "配列ではありません";
+                const data = JSON.parse(kifInput.value);
+                if (!Array.isArray(data)) throw "棋譜が配列ではありません";
                 kifData = data;
 
-                // ゲーム初期化
+                // 初期化
                 frame = 0;
+                second = 0;
+                cost = 10;
                 snakes.length = 0;
                 enemies.length = 0;
                 effects.length = 0;
-                cost = 10;
-                second = 0;
+                costEffects.length = 0;
+                enemiesDefeated = 0;
                 gameOver = false;
                 recordIndex = 0;
                 gameStarted = true;
@@ -109,42 +117,62 @@
             }
         };
 
-        // -------------------------
-        // ロジック更新
-        // -------------------------
-        function updateLogic() {
-            if (gameOver || !gameStarted) return;
+        // updateLogicを棋譜再生対応に上書き
+        const originalUpdateLogic = updateLogic;
+        updateLogic = function () {
+            if (gameOver) return;
 
             frame++;
 
-            // 棋譜操作を再生
-            while (recordIndex < kifData.length && kifData[recordIndex].frame <= frame) {
-                const act = kifData[recordIndex];
-                if (act.action === "placeSnake") {
-                    snakes.push({ ...act, timer: 0 });
+            // ---------------------------
+            // 棋譜再生による蛇の配置・強化
+            // ---------------------------
+            if (gameStarted && kifData && recordIndex < kifData.length) {
+                while (recordIndex < kifData.length && kifData[recordIndex].frame <= frame) {
+                    const act = kifData[recordIndex];
+
+                    if (act.action === "placeSnake") {
+                        snakes.push({ ...act, timer: 0 });
+
+                    } else if (act.action === "upgradeSnake") {
+                        const s = snakes.find(s => s.id === act.id);
+                        if (s) s.level = act.level;
+                    }
+
+                    recordIndex++;
                 }
-                if (act.action === "upgradeSnake") {
-                    const s = snakes.find(s => s.id === act.id);
-                    if (s) s.level = act.level;
-                }
-                recordIndex++;
             }
 
-            if (frame % 60 === 0) second++;
+            // ---------------------------
+            // 通常の時間処理
+            // ---------------------------
+            if (frame % FPS === 0) {
+                second++;
+                cost++;
+            }
 
-            // 敵生成
-            const spawnInterval = Math.max(120 - frame / 30, 50);
-            if (frame % spawnInterval === 0) spawnEnemy();
+            // ---------------------------
+            // 敵の自動生成（index.js と同じロジック）
+            // ---------------------------
+            const spawnInterval = Math.max(120 - frame / 30, 50); // 出現間隔を徐々に短縮
+            if (frame % spawnInterval === 0) {
+                spawnEnemy(); // index.js と同じ仕様で生成
+            }
 
-            // 蛇攻撃・生産・減速
+            // ---------------------------
+            // 蛇の攻撃・生産・減速処理
+            // ---------------------------
             snakes.forEach(s => {
                 s.timer++;
                 const t = getSnakeStats(s);
+
+                // 所持金生成
                 if (t.produceSec && s.timer % (t.produceSec * FPS) === 0) {
                     cost++;
                     costEffects.push({ x: s.x, y: s.y - 20, text: `+${t.produceAmmount}`, life: 30 });
                 }
 
+                // 攻撃
                 enemies.forEach(e => {
                     const d = Math.hypot(e.x - s.x, e.y - s.y);
                     if (d < t.range && t.rate && s.timer % t.rate === 0) {
@@ -153,125 +181,72 @@
                             e.slow = t.slow;
                             e.slowTimer = t.slowTime;
                         }
-                        if (t.dmg && t.dmg > 0) effects.push({ x: e.x, y: e.y, text: `-${t.dmg}`, life: 30 });
+                        if (t.dmg && t.dmg > 0) {
+                            effects.push({ x: e.x, y: e.y, text: `-${t.dmg}`, life: 30 });
+                        }
+                        if (t.poison) e.poison += t.poison;
                     }
                 });
             });
 
-            // 敵移動
+            // ---------------------------
+            // 敵の移動・HP減少
+            // ---------------------------
             enemies.forEach(e => {
-                if (e.slowTimer > 0) e.slowTimer--; else e.slow = 1;
+                if (e.slowTimer > 0) e.slowTimer--;
+                else e.slow = 1;
+
                 e.y += e.speed * e.slow;
                 e.hp -= e.poison;
+
                 if (e.y > defenseLine) gameOver = true;
             });
 
+            // 倒れた敵削除
             for (let i = enemies.length - 1; i >= 0; i--) {
-                if (enemies[i].hp <= 0) enemies.splice(i, 1);
+                if (enemies[i].hp <= 0) {
+                    enemies.splice(i, 1);
+                    enemiesDefeated++;
+                }
             }
 
-            // エフェクト
+            // ---------------------------
+            // エフェクト処理
+            // ---------------------------
             for (let i = effects.length - 1; i >= 0; i--) {
                 effects[i].y -= 0.5;
                 effects[i].life--;
                 if (effects[i].life <= 0) effects.splice(i, 1);
             }
-        }
 
-        // -------------------------
-        // 描画
-        // -------------------------
-        function draw() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // UI更新
+            const costEl = document.getElementById("cost");
+            if (costEl) costEl.textContent = cost;
+            const timeEl = document.getElementById("time");
+            if (timeEl) timeEl.textContent = second;
 
-            // レーン
-            ctx.strokeStyle = "#333";
-            lanes.forEach(x => {
-                ctx.beginPath();
-                ctx.moveTo(x, 0);
-                ctx.lineTo(x, canvas.height);
-                ctx.stroke();
-            });
-
-            // 防衛ライン
-            ctx.strokeStyle = "red";
-            ctx.beginPath();
-            ctx.moveTo(0, defenseLine);
-            ctx.lineTo(canvas.width, defenseLine);
-            ctx.stroke();
-
-            // 蛇
-            snakes.forEach(s => {
-                const t = getSnakeStats(s);
-
-                // 攻撃範囲
-                ctx.fillStyle = "rgba(0,255,0,0.08)";
-                ctx.beginPath();
-                ctx.arc(s.x, s.y, t.range, 0, Math.PI * 2);
-                ctx.fill();
-                //接触範囲
-                ctx.lineWidth = SNAKE_DISTANCE_LINE_WIDTH;
-                ctx.strokeStyle = "rgba(255,0,0,0.15)";
-                ctx.beginPath();
-                ctx.arc(s.x, s.y, SNAKE_MIN_DISTANCE, 0, Math.PI * 2);
-                //ctx.lineWidth = 1.0;
-                ctx.stroke();
-                ctx.lineWidth = SNAKE_LINE_WIDTH;
-                //体
-                //ctx.fillStyle = "green";
-                //ctx.fillRect(s.x - 8, s.y - 8, 16, 16);
-                const img = ImageManager.get(t.imgKey);
-                const size = getEntitySize(IMG_BASE_SIZE, t.level);
-                ctx.drawImage(
-                    img,
-                    s.x - size / 2,
-                    s.y - size / 2,
-                    size,
-                    size
-                );
-
-                if (img.complete) {
-                    ctx.drawImage(
-                        img,
-                        s.x - size / 2,
-                        s.y - size / 2,
-                        size,
-                        size
-                    );
-                }
-            });
+            updateScoreUI();
+        };
 
 
-            // 敵
-            enemies.forEach(e => {
-                const img = ImageManager.get(enemyTypes.normal.imgKey);
-                const size = IMG_BASE_SIZE;
-                ctx.drawImage(img, e.x - size / 2, e.y - size / 2, size, size);
-            });
+        // URLクエリパラメータから自動再生
+        const params = new URLSearchParams(window.location.search);
+        const kifParam = params.get("kif");
 
-            // エフェクト
-            effects.forEach(f => {
-                ctx.fillStyle = `rgba(255,255,255,${f.life / 30})`;
-                ctx.fillText(f.text, f.x, f.y);
-            });
-        }
+        if (kifParam) {
+            try {
+                const decoded = decodeURIComponent(kifParam);
+                kifInput.value = decoded;
 
-        // -------------------------
-        // ゲームループ
-        // -------------------------
+                // 自動再生
+                loadBtn.click();
 
-        function gameLoop(now) {
-            const delta = now - lastTime;
-            lastTime = now;
-            accumulator += delta;
-
-            while (accumulator >= FRAME_TIME) {
-                for (let i = 0; i < speedMultiplier; i++) updateLogic();
-                accumulator -= FRAME_TIME;
+                // 入力欄非表示
+                kifInput.style.display = "none";
+                loadBtn.style.display = "none";
+            } catch (e) {
+                console.error("棋譜自動読み込み失敗:", e);
             }
-
-            draw();
-            if (!gameOver && gameStarted) requestAnimationFrame(gameLoop);
         }
     </script>
 
