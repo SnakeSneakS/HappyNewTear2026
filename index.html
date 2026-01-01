@@ -45,12 +45,13 @@
   <canvas id="game" width="360" height="560"></canvas>
 
   <!-- 操作説明UI -->
+  <!-- 操作説明UI -->
   <div id="help-ui" style="
   position: fixed;
   top: 10px;
   left: 10px;
   width: 250px;
-  background: rgba(0,0,0,0.6);
+  background: rgba(0,0,0,0.7);
   color: #fff;
   padding: 10px;
   border-radius: 8px;
@@ -58,38 +59,31 @@
   font-size: 13px;
   z-index: 1000;
 ">
-    <h3 style="margin:0 0 6px 0; font-size:14px;">操作方法と表示解説</h3>
+    <h3 style="margin:0 0 6px 0; font-size:14px;">操作の基本</h3>
     <ul style="margin:0; padding-left:18px;">
       <li>蛇ボタンをドラッグ or タップ → 設置</li>
-      <li>設置済みの蛇をクリック → 強化</li>
-      <li>ゲーム速度変更: x1〜x10</li>
-      <li>敵が赤線（防衛ライン）を越えるとゲームオーバー</li>
-      <li>右上でスコア確認可能</li>
-      <li>ゲーム終了後は名前・コメント入力でランキング送信</li>
+      <li>設置蛇をクリック → 強化</li>
+      <li>敵が赤線越えるとゲームオーバー</li>
+      <li>右上でスコア確認</li>
     </ul>
-    <h4 style="margin:6px 0 4px 0; font-size:13px;">視覚表示の意味</h4>
+
+    <h4 style="margin:6px 0 4px 0; font-size:13px;">円の意味</h4>
     <ul style="margin:0; padding-left:18px;">
-      <li><span style="color:lime;">緑円</span>: 蛇の攻撃範囲</li>
-      <li><span style="color:red;">赤円</span>: 他の蛇との最小距離</li>
-      <li><span style="color:red;">赤線</span>: 防衛ライン。越えるとゲームオーバー</li>
-      <li>敵のHPバー: 緑 → HP高、オレンジ → 半分以下、赤 → 危険</li>
+      <li><span style="color:lime;">緑円</span>: 攻撃範囲</li>
+      <li><span style="color:red;">赤円</span>: 最小距離</li>
+      <li><span style="color:red;">赤線</span>: 防衛ライン</li>
     </ul>
-    <h3 style="margin:0 0 6px 0; font-size:14px;">世界観</h3>
-    <p style="margin:0; line-height:1.4;">
-      この世界では、毎年「干支の力」が入れ替わります。
-      現在は巳年（蛇）が支配していましたが、午年（馬）の到来により、力のバランスが変わろうとしています。<br>
-      プレイヤーは蛇の一族の長となり、迫り来る馬の軍勢から拠点を守らなければなりません。<br>
-      蛇は巧妙に攻撃し、資源を生産し、敵の動きを阻みます。<br>
-      馬は力強く突進してきます。<br>
-      巳年から午年への移行が、戦いの緊迫感を増しています。
-    </p>
 
-    <h3 style="margin:0 0 6px 0; font-size:14px;">p.s.</h3>
-    <p style="margin:0; line-height:1.4;">
-      やろうよ！タワーディフェンス！！
-    </p>
+
+    <h4 style="margin:6px 0 4px 0; font-size:13px;">p.s. </h4>
+    明けましておめでとうございます。やろうよ！タワーディフェンスゲーム！！
+
+    <h4 style="margin:6px 0 4px 0; font-size:13px;">動画で学ぶ</h4>
+    <video id="help-video" width="220" controls style="display:block; margin-top:4px; border-radius:6px;">
+      <source src="imgs/demo.mov" type="video/mp4">
+      お使いのブラウザは動画再生に対応していません
+    </video>
   </div>
-
 
 
   <div id="ui">
